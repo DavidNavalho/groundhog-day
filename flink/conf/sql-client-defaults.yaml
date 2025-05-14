@@ -1,0 +1,10 @@
+execution:
+  target: remote  # run queries on a remote cluster
+
+deployment:
+  target: remote
+
+# point to your JobManager REST endpoint
+remote:
+  address: flink-jobmanager
+  port: 8081

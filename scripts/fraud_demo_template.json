@@ -1,0 +1,24 @@
+{
+  "index_templates" : [
+    {
+      "name" : "fraud_demo_template",
+      "index_template" : {
+        "index_patterns" : [
+          "transactions",
+          "suspicious"
+        ],
+        "template" : {
+          "mappings" : {
+            "properties" : {
+              "timestamp" : {
+                "format" : "strict_date_time||epoch_millis",
+                "type" : "date"
+              }
+            }
+          }
+        },
+        "composed_of" : [ ]
+      }
+    }
+  ]
+}

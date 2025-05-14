@@ -1,0 +1,13 @@
+FROM flink:1.18.1-scala_2.12
+
+# Copy your SQL pipeline into the image
+COPY sql/pipeline.sql /opt/flink/sql/pipeline.sql
+
+# Override entrypoint to first start the JobManager,
+# wait for it to be healthy, then submit the SQL job,
+# then tail the logs so the container doesn't exit.
+
+COPY entrypoint-jobmanager.sh /opt/flink/bin/entrypoint-jobmanager.sh
+RUN chmod +x /opt/flink/bin/entrypoint-jobmanager.sh
+
+ENTRYPOINT ["/opt/flink/bin/entrypoint-jobmanager.sh"]

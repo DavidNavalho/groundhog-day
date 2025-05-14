@@ -1,0 +1,150 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    ports:
+      - '2181:2181'
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    ports:
+      - '9092:9092'
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+
+
+  jobmanager:
+    build:
+      context: ./flink
+    image: flink-custom:1.18.1
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    volumes:
+      - ./flink/sql:/opt/flink/sql:ro
+      - ./flink/conf:/opt/flink/conf:ro
+    # environment:
+    #   - JOB_MANAGER_RPC_ADDRESS=flink-jobmanager
+
+  taskmanager:
+    build:
+      context: ./flink
+    image: flink-custom:1.18.1
+    container_name: flink-taskmanager
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    volumes:
+      - ./flink/conf:/opt/flink/conf:ro
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    container_name: elasticsearch
+    ports:
+      - '9200:9200'
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.2
+    container_name: kibana
+    ports:
+      - '5601:5601'
+    depends_on:
+      - elasticsearch
+    environment:
+      ELASTICSEARCH_HOSTS: 'http://elasticsearch:9200'
+
+  data_generator:
+    build:
+      context: ./data_generator
+    container_name: data-generator
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - TOPIC=transactions
+    command: ["python", "/app/generate_transactions.py"]
+  
+  es_indexer:
+    build:
+      context: ./data_indexer
+    container_name: es-indexer
+    depends_on:
+      - kafka
+      - elasticsearch
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SUSPICIOUS_TOPIC=suspicious
+      - ES_HOST=elasticsearch
+      - ES_PORT=9200
+      - ES_INDEX=suspicious
+
+  demo-init:
+    image: confluentinc/cp-kafka:7.5.0  
+    container_name: demo-init
+    depends_on:
+      - zookeeper
+      - kafka
+      - elasticsearch
+      - jobmanager
+      - kibana
+    volumes:
+      - ./scripts:/scripts:ro
+    entrypoint: ["/scripts/init-demo.sh"]
+
+  
+  akhq:
+    image: tchiotludo/akhq:latest
+    container_name: akhq
+    ports:
+      - "8082:8080"
+    environment:
+      # configure a “local” cluster
+      AKHQ_CONFIGURATION: |
+        akhq:
+          connections:
+            local:
+              properties:
+                bootstrap.servers: "kafka:9092"
+    depends_on:
+      - kafka
+  
+  # kafka-ui: #alternative Kafka UI
+  #   image: provectuslabs/kafka-ui:latest
+  #   container_name: kafka-ui
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: "local"
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9092"
+  #     DYNAMIC_CONFIG_ENABLED: "true"
+  #   depends_on:
+  #     - kafka
+
+  # kafdrop: #alternative Kafka UI - very lean, less flashy - quite like it
+  #   image: obsidiandynamics/kafdrop:latest
+  #   container_name: kafdrop
+  #   ports:
+  #     - "9000:9000"
+  #   environment:
+  #     KAFKA_BROKERCONNECT: "kafka:9092"
+  #     JVM_OPTS: "-Xms32M -Xmx64M"
+  #   depends_on:
+  #     - kafka
+
+  
+

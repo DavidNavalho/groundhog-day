@@ -1,0 +1,12 @@
+# --- RPC settings so TM can locate the JM ---
+jobmanager.rpc.address: flink-jobmanager
+jobmanager.rpc.port: 6123
+
+# --- Execution settings ---
+parallelism.default: 1
+taskmanager.numberOfTaskSlots: 5
+
+# --- Memory settings ---
+jobmanager.memory.flink.size: 512m
+taskmanager.memory.flink.size: 512m
+taskmanager.memory.managed.size: 64m

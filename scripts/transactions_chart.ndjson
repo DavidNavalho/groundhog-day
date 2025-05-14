@@ -1,0 +1,2 @@
+{"attributes":{"allowHidden":false,"fieldAttrs":"{}","fieldFormatMap":"{}","fields":"[]","name":"transactions","runtimeFieldMap":"{}","sourceFilters":"[]","timeFieldName":"timestamp","title":"transactions*"},"coreMigrationVersion":"8.8.0","created_at":"2025-05-11T01:14:47.855Z","id":"129fc559-27c4-412b-ad9a-485bee83db71","managed":false,"references":[],"type":"index-pattern","typeMigrationVersion":"8.0.0","updated_at":"2025-05-11T01:14:47.855Z","version":"WzYsMV0="}
+{"excludedObjects":[],"excludedObjectsCount":0,"exportedCount":1,"missingRefCount":0,"missingReferences":[]}
