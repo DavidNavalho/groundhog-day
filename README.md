@@ -16,26 +16,34 @@ in under a minute, illustrating “minutes vs. months” in enterprise rollout t
 
 ## 🚀 Quick Start
 
-1. **Build all images** (only required once or after changes)  
-   ```bash
-   docker-compose build
-   ```
+### Prepare Flink connectors (run once only)
 
-2. **Bring up the demo**  
-   ```bash
+Before you build your Flink Docker images, download the two required SQL connector JARs:
+
+```bash
+# from your project root
+mkdir -p flink/plugins
+
+# Kafka SQL connector (version 3.1.0-1.18)
+curl -L -o flink/plugins/flink-sql-connector-kafka-3.1.0-1.18.jar https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.1.0-1.18/flink-sql-connector-kafka-3.1.0-1.18.jar
+
+# Elasticsearch7 SQL connector (version 3.1.0-1.18)
+curl -L -o flink/plugins/flink-sql-connector-elasticsearch7-3.1.0-1.18.jar https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.1.0-1.18/flink-sql-connector-elasticsearch7-3.1.0-1.18.jar
+```
+
+### Running the demo
+
+ ```bash
    docker-compose up -d
    ```
-
-3. **Submit the Flink job**  
-   ```bash
-   docker exec -it flink-jobmanager \
-     /opt/flink/bin/sql-client.sh embedded \
-     -f /opt/flink/sql/pipeline.sql
-   ```
-
-4. **View the UIs**  
-   - **Kibana:**  http://localhost:5601 → Dashboard “Real-Time Fraud Demo”  
+  **View the UIs**  
    - **AKHQ:**   http://localhost:8082 → cluster “local” → topics  
+   - **Flink Dashboard:** http://localhost:8081
+   - **Kibana:**  http://localhost:5601 → Dashboard “Real-Time Fraud Demo” 
+   - **Kibana Dashboards:** [kibana demo dashboard](http://localhost:5601/app/dashboards#/view/d723d171-c76d-4ad8-9b25-1c419bf8432f?_g=(filters:!(),refreshInterval:(pause:!f,value:10000),time:(from:now-5m,to:now)))
+
+
+
 
 ---
 
@@ -82,6 +90,19 @@ docker-compose down --volumes --remove-orphans
 - **`scripts/init-demo.sh`**  
   Creates Kafka topics, applies ES index-template, imports Kibana NDJSON saved-objects.
 
+---
+
+## Some additional information
+
+1. [Optional] **Build all images** (only required after changes, otherwise it should build automatically on first run)  
+   ```bash
+   docker-compose build
+   ```
+
+2. [Optional] **Submit a Flink job from terminal** (the docker-compose already submits the job)
+   ```bash
+   docker exec -it flink-jobmanager /opt/flink/bin/sql-client.sh embedded -f /opt/flink/sql/pipeline.sql
+   ```
 ---
 
 ## 👏 Enjoy!

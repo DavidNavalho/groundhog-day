@@ -1,0 +1,15 @@
+# Dockerfile.submit
+FROM flink:1.18.1-scala_2.12
+
+COPY flink/plugins/ /opt/flink/lib/
+
+# Switch to root so we can set perms at build time
+USER root
+# Copy in your SQL-submit script and make it executable in one go
+# (Docker 18.09+ lets us set perms via --chmod, so no explicit chmod needed)
+COPY --chmod=755 scripts/submit-sql.sh /scripts/submit-sql.sh
+
+# Drop back to non-root for runtime
+USER 1001
+
+ENTRYPOINT ["/scripts/submit-sql.sh"]

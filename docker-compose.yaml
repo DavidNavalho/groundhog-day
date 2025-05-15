@@ -27,6 +27,7 @@ services:
   jobmanager:
     build:
       context: ./flink
+      dockerfile: Dockerfile
     image: flink-custom:1.18.1
     container_name: flink-jobmanager
     ports:
@@ -41,6 +42,7 @@ services:
   taskmanager:
     build:
       context: ./flink
+      dockerfile: Dockerfile
     image: flink-custom:1.18.1
     container_name: flink-taskmanager
     depends_on:
@@ -71,6 +73,7 @@ services:
   data_generator:
     build:
       context: ./data_generator
+      dockerfile: Dockerfile
     container_name: data-generator
     depends_on:
       - kafka
@@ -82,6 +85,7 @@ services:
   es_indexer:
     build:
       context: ./data_indexer
+      dockerfile: Dockerfile
     container_name: es-indexer
     depends_on:
       - kafka
@@ -93,8 +97,24 @@ services:
       - ES_PORT=9200
       - ES_INDEX=suspicious
 
+  # demo-init:
+  #   image: confluentinc/cp-kafka:7.5.0  
+  #   container_name: demo-init
+  #   depends_on:
+  #     - zookeeper
+  #     - kafka
+  #     - elasticsearch
+  #     - jobmanager
+  #     - kibana
+  #   volumes:
+  #     - ./scripts:/scripts:ro
+  #   entrypoint: ["/scripts/init-demo.sh"]
+ 
   demo-init:
-    image: confluentinc/cp-kafka:7.5.0  
+    build:
+      context: .
+      dockerfile: Dockerfile.demo-init
+    image: demo-init:latest
     container_name: demo-init
     depends_on:
       - zookeeper
@@ -102,10 +122,19 @@ services:
       - elasticsearch
       - jobmanager
       - kibana
+  
+  flink-submit:
+    build:
+      context: .
+      dockerfile: Dockerfile.submit
+    image: flink-submit:demo
+    container_name: flink-submit
+    depends_on:
+      - jobmanager
+    # No mounts needed for scripts, since they're baked in
     volumes:
-      - ./scripts:/scripts:ro
-    entrypoint: ["/scripts/init-demo.sh"]
-
+      - ./flink/sql:/opt/flink/sql:ro
+      - ./flink/conf:/opt/flink/conf:ro
   
   akhq:
     image: tchiotludo/akhq:latest

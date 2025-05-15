@@ -1,0 +1,15 @@
+# Dockerfile.demo-init
+FROM confluentinc/cp-kafka:7.5.0
+
+# Become root so we can copy in and chmod scripts
+USER root
+
+# Copy your scripts in and mark executable
+COPY scripts/ /scripts/
+RUN chmod +x /scripts/init-demo.sh
+
+# (Optional) drop back to the kafka user for runtime security
+USER 1001
+
+# Run the init script
+ENTRYPOINT ["/scripts/init-demo.sh"]

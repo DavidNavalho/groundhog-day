@@ -1,59 +1,66 @@
 #!/usr/bin/env bash
-set -eux
+set -euo pipefail
 
-# 1) Wait for Kafka to be ready
-cub kafka-ready -b kafka:9092 1 20
+# How long to sleep between retries
+RETRY_INTERVAL=5
+
+# Helper: retry a command until it succeeds
+# Usage: retry_until_ok "echo hello" "optional failure message"
+retry_until_ok() {
+  local cmd="$1" fail_msg="${2:-Command failed, retrying…}"
+  until eval "$cmd"; do
+    echo "❌ $fail_msg"
+    sleep "$RETRY_INTERVAL"
+  done
+}
+
+echo "🔄 Starting demo-init (will retry until everything is ready)…"
+
+# 1) Wait for Kafka
+echo "⏳ Waiting for Kafka broker…"
+retry_until_ok \
+  "cub kafka-ready -b kafka:9092 1 20" \
+  "Kafka not ready yet"
 
 # 2) Create topics (idempotent)
-kafka-topics --bootstrap-server kafka:9092 \
-  --create --topic transactions --partitions 1 --replication-factor 1 || true
-kafka-topics --bootstrap-server kafka:9092 \
-  --create --topic suspicious --partitions 1 --replication-factor 1 || true
+echo "🎯 Creating topics…"
+retry_until_ok \
+  "kafka-topics --bootstrap-server kafka:9092 --create --topic transactions --partitions 1 --replication-factor 1 || true" \
+  "Failed to create 'transactions' topic"
+retry_until_ok \
+  "kafka-topics --bootstrap-server kafka:9092 --create --topic suspicious --partitions 1 --replication-factor 1 || true" \
+  "Failed to create 'suspicious' topic"
 
-# 3) Wait for Elasticsearch
-# 3) Wait for Elasticsearch to be yellow or green
-# Wait for Elasticsearch to be yellow or green (no jq required)
-echo "⏳ Waiting for Elasticsearch (yellow or green)…"
-while true; do
-  health_json=$(curl -s http://elasticsearch:9200/_cluster/health)
-  # Extract the status field value via grep/sed
-  status=$(echo "$health_json" | grep -oP '"status"\s*:\s*"\K[^"]+')
-  if [[ "$status" == "yellow" || "$status" == "green" ]]; then
-    echo "✅ Elasticsearch is $status"
-    break
-  fi
-  echo "⏳ Current ES status: $status; retrying…"
-  sleep 2
-done
+# 3) Wait for Elasticsearch (yellow or green)
+echo "⏳ Waiting for Elasticsearch cluster health (yellow/green)…"
+retry_until_ok \
+  "curl -fsS http://elasticsearch:9200/_cluster/health | grep -E '\"status\"\s*:\s*\"(yellow|green)\"'" \
+  "Elasticsearch not yet healthy"
 
-# 4) Push index template so timestamp is a date
-curl -X PUT http://elasticsearch:9200/_index_template/fraud_demo_template \
-  -H 'Content-Type: application/json' -d @/scripts/fraud_demo_template.json
+# 4) Push index template #Remove: we don't need this anymore
+# echo "📐 Installing ES index template…"
+# retry_until_ok \
+#   "curl -fsS -X PUT http://elasticsearch:9200/_index_template/fraud_demo_template -H 'Content-Type: application/json' -d @/scripts/fraud_demo_template.json" \
+#   "Failed to push ES index template"
 
 # 5) Submit Flink SQL job
-#    (Note: uses the embedded SQL client in non-interactive mode)
-# until docker exec flink-jobmanager \
-#       /opt/flink/bin/sql-client.sh embedded -f /opt/flink/sql/pipeline.sql ; do
-#   echo "Retry Flink SQL submission…"; sleep 5
-# done
+# echo "🚀 Submitting Flink SQL job…"
+# retry_until_ok \
+#   "docker exec flink-jobmanager /opt/flink/bin/sql-client.sh embedded -f /opt/flink/sql/pipeline.sql" \
+#   "Flink SQL submission failed"
 
 # 6) Wait for Kibana
-until curl -s http://kibana:5601/api/status | grep '"overall":' ; do
-  echo "Waiting for Kibana…"; sleep 2
+echo "⏳ Waiting for Kibana to be ready…"
+retry_until_ok \
+  "curl -fsS http://kibana:5601/api/status | grep '\"overall\":'" \
+  "Kibana not ready yet"
+
+# 7) Import Kibana saved objects
+for file in transactions_chart.ndjson suspicious_chart.ndjson fraud_demo_dashboard.ndjson; do
+  echo "🖼️  Importing Kibana saved object: $file"
+  retry_until_ok \
+    "curl -fsS -X POST 'http://kibana:5601/api/saved_objects/_import?overwrite=true' -H 'kbn-xsrf: true' --form file=@/scripts/$file" \
+    "Failed to import $file"
 done
-
-# 7) Import Kibana saved objects (visualizations + dashboard)
-#    Use the Kibana import API; the JSON files should live in /scripts
-curl -X POST 'http://kibana:5601/api/saved_objects/_import?overwrite=true' \
-     -H 'kbn-xsrf: true' \
-     --form file=@/scripts/transactions_chart.ndjson
-
-curl -X POST 'http://kibana:5601/api/saved_objects/_import?overwrite=true' \
-     -H 'kbn-xsrf: true' \
-     --form file=@/scripts/suspicious_chart.ndjson
-
-curl -X POST 'http://kibana:5601/api/saved_objects/_import?overwrite=true' \
-     -H 'kbn-xsrf: true' \
-     --form file=@/scripts/fraud_demo_dashboard.ndjson
 
 echo "🎉 Demo initialization complete."
